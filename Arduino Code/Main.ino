@@ -1,7 +1,9 @@
-#include <LiquidCrystal.h>
+#include <fastIO.h>
+#include <SevenSegmentPanel.h>
+#include <LiquidCrystal_74HC595.h>
 #include <FastLED.h>
 
-LiquidCrystal lcd = LiquidCrystal(2, 3, 4, 5, 6, 7);
+LiquidCrystal_74HC595 lcd(11, 13, 12, 1, 3, 4, 5, 6, 7);
 //possibly make separate class for input stuff? joystick + button
 double joyX; // joystick x coordinate
 double joyY; // joystick y coordinate
