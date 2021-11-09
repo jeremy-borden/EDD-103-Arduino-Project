@@ -1,0 +1,6 @@
+Input   KEYWORD1
+joystickAngle   KEYWORD2
+joystickMagnitude   KEYWORD3
+getJoystickX    KEYWORD4
+getJoystickY    KEYWORD5
+update  KEYWORD6
