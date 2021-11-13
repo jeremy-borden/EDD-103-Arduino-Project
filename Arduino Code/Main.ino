@@ -37,7 +37,7 @@ void setup()
 
 void loop()
 {
-    
+    displayDigit(8);
 }
 
 //INPUT FUNCTIONS
