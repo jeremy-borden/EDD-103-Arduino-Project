@@ -37,7 +37,11 @@ void setup()
 
 void loop()
 {
-    displayDigit(8);
+    for(int i = 0; i<10; i++){
+        displayDigit(i);
+        delay(100);
+    }
+    
 }
 
 //INPUT FUNCTIONS
