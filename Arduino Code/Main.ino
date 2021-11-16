@@ -1,17 +1,23 @@
 #include <LiquidCrystal_74HC595.h>
 #include <FastLED.h>
 
-//input
+//pins
+#define BUTTON_PIN 8
+#define JOYSTICK_X_PIN A0
+#define JOYSTICK_Y_PIN A1
+#define SSD_LATCH_PIN 6
+#define SSD_CLOCK_PIN 7
+#define SSD_DATA_PIN 5
+#define BUZZER_PIN 10
+#define ledPin 9
+
+#define NUM_LEDS 144
+CRGB leds[NUM_LEDS];
+
 double joystickX;
 double joystickY;
-uint8_t buttonPin = 8;
-uint8_t joystickPinX = A0;
-uint8_t joystickPinY = A1;
 
-//7 segment display
-uint8_t ssdLatchPin = 6;
-uint8_t ssdClockPin = 7;
-uint8_t ssdDataPin = 5;
+LiquidCrystal_74HC595 lcd(11, 13, 12, 1, 3, 4, 5, 6, 7);
 
 byte sevenSegDigits[10] = {
     B01111011, // = 0
@@ -25,19 +31,29 @@ byte sevenSegDigits[10] = {
     B11111011, // = 8
     B11001011  // = 9
 };
-//lcd
-LiquidCrystal_74HC595 lcd(11, 13, 12, 1, 3, 4, 5, 6, 7);
+
+boolean isPlaying = false;
+int patternArray[255];
+int numColors = 4;
+int timeToAnswer = 5;
 
 void setup()
 {
-    pinMode(ssdLatchPin, OUTPUT);
-    pinMode(ssdClockPin, OUTPUT);
-    pinMode(ssdDataPin, OUTPUT);
+    Serial.begin(9600);
+
+    FastLED.addLeds<WS2812B, ledPin, GRB>(leds, NUM_LEDS);
+    FastLED.setBrightness(50);
+
+    randomSeed(analogRead(0));
+
+    pinMode(SSD_LATCH_PIN, OUTPUT);
+    pinMode(SSD_CLOCK_PIN, OUTPUT);
+    pinMode(SSD_DATA_PIN, OUTPUT);
 }
 
 void loop()
 {
-    displayDigit(8);
+    
 }
 
 //INPUT FUNCTIONS
@@ -53,20 +69,23 @@ double joystickMagnitude()
 
 void joystickUpdate()
 {
-    joystickX = map(analogRead(joystickPinX), 0, 1023, -512, 512) / 512.0;
-    joystickY = -map(analogRead(joystickPinY), 0, 1023, -512, 512) / 512.0;
+    joystickX = map(analogRead(JOYSTICK_X_PIN), 0, 1023, -512, 512) / 512.0;
+    joystickY = -map(analogRead(JOYSTICK_Y_PIN), 0, 1023, -512, 512) / 512.0;
 }
 
+//DISPLAY FUNCTIONS
 void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 {
-    digitalWrite(ssdLatchPin, LOW);
+    digitalWrite(SSD_LATCH_PIN, LOW);
     if (digit == -1)
     {
-        shiftOut(ssdDataPin, ssdClockPin, MSBFIRST, B00000000);
+        shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, B00000000);
     }
     else
     {
-        shiftOut(ssdDataPin, ssdClockPin, MSBFIRST, sevenSegDigits[digit]);
+        shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, sevenSegDigits[digit]);
     }
-    digitalWrite(ssdLatchPin, HIGH);
+    digitalWrite(SSD_LATCH_PIN, HIGH);
 }
+
+//MENU FUNCTIONS
