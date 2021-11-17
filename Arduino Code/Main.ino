@@ -49,7 +49,7 @@ enum class GameState
 
 GameState gameState = GameState::Menu;
 int menuScreen = 0;
-int selectedScreen = NULL;
+int selectedScreen = -1;
 boolean isPlaying = false;
 int patternArray[255];
 int numColors = 4;
@@ -74,13 +74,10 @@ void setup()
 void loop()
 {
     inputUpdate();
-
+    //MENU
     if (gameState == GameState::Menu)
     {
-        lcd.setCursor(0, 0);
-        lcd.print("<");
-        lcd.setCursor(15, 0);
-        lcd.print(">");
+
         switch (menuScreen)
         {
         case 0: // Play screen
@@ -105,23 +102,136 @@ void loop()
             lcd.setCursor(2, 0);
             lcd.print("Answer Time");
             lcd.setCursor(7, 1);
-            lcd.print(timeToAnswer);
+            if (timeToAnswer == 10)
+                lcd.print("INF");
+            else
+                lcd.print(timeToAnswer);
             if (buttonPressed)
             {
                 selectedScreen = 2;
             }
             break;
         }
-        //switch to handle sleected screen?
-        switch (selectedScreen)
-        {
-        case NULL: //no screen is selected, allow player to scroll thru screens
 
+        switch (selectedScreen) //this is disgusting. if you have time please fix this
+        {
+        case -1: //no screen is selected, allow player to scroll thru screens
+            if (menuScreen != 0)
+            {
+                lcd.setCursor(0, 0);
+                lcd.print("<");
+            }
+            if (menuScreen != 2)
+            {
+                lcd.setCursor(15, 0);
+                lcd.print(">");
+            }
+            if (joystickMoved)
+            {
+                if (joystickDirection == 1)
+                {
+                    menuScreen++;
+                    if (menuScreen > 2)
+                    {
+                        menuScreen = 2;
+                    }
+                }
+                else if (joystickDirection == 3)
+                {
+                    menuScreen--;
+                    if (menuScreen < 0)
+                    {
+                        menuScreen = 0;
+                    }
+                }
+            }
+            break;
+        case 0: //Selected play
+            for (int i = 0; i < 255; i++)
+            {
+                patternArray[i] = random(0, numColors - 1);
+            }
+            gameState = GameState::Game;
+            break;
+        case 1: //Selected color num
+            if (numColors != 2)
+            {
+                lcd.setCursor(6, 0);
+                lcd.print("<");
+            }
+            if (numColors != 12)
+            {
+                lcd.setCursor(9, 0);
+                lcd.print(">");
+            }
+            if (joystickMoved)
+            {
+                if (joystickDirection == 1)
+                {
+                    numColors++;
+                    if (numColors > 12)
+                    {
+                        numColors = 12;
+                    }
+                }
+                else if (joystickDirection == 3)
+                {
+                    numColors--;
+                    if (numColors < 2)
+                    {
+                        numColors = 2;
+                    }
+                }
+            }
+            if (buttonPressed)
+            {
+                selectedScreen = -1;
+            }
+            break;
+        case 2: //selected answer time
+            if (timeToAnswer != 3)
+            {
+                lcd.setCursor(6, 0);
+                lcd.print("<");
+            }
+            if (timeToAnswer != 10)
+            {
+                lcd.setCursor(9, 0);
+                lcd.print(">");
+            }
+            if (joystickMoved)
+            {
+                if (joystickDirection == 1)
+                {
+                    timeToAnswer--;
+                    if (timeToAnswer > 10)
+                    {
+                        timeToAnswer = 10;
+                    }
+                }
+                else if (joystickDirection == 3)
+                {
+                    timeToAnswer--;
+                    if (timeToAnswer < 3)
+                    {
+                        timeToAnswer = 3;
+                    }
+                }
+            }
+            if (buttonPressed)
+            {
+                selectedScreen = -1;
+            }
             break;
         }
     }
-
+    //GAME
+    if (gameState == GameState::Game)
+    {
+    
+    }
     lcd.clear();
+    FastLED.show();
 }
 
 //INPUT FUNCTIONS
@@ -136,13 +246,15 @@ void inputUpdate()
     joystickAngle = (int)(degrees(atan2(-joystickY, -joystickX)) + 180) % 360;
     joystickMagnitude = sqrt(sq(joystickY * sqrt(1.0 - (joystickX * joystickX * .5))) + sq(joystickX * sqrt(1.0 - (joystickY * joystickY * .5))));
 
-    joystickMoved = joystickMagnitude>3;
+    joystickMoved = joystickMagnitude >= 0.5 && joystickReleased;
+    joystickReleased = joystickMagnitude < 0.5;
+
     joystickDirection = calculateJoystickDirection();
 }
 
 int calculateJoystickDirection()
 {
-    if (joystickMagnitude < 0.7)
+    if (joystickMagnitude < 0.5)
     {
         return 0; //CENTER
     }
@@ -166,10 +278,10 @@ int calculateJoystickDirection()
 }
 
 //DISPLAY FUNCTIONS
-void displayDigit(int digit) // display digit on 7sd, NULL to clear display
+void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 {
     digitalWrite(SSD_LATCH_PIN, LOW);
-    if (digit == NULL)
+    if (digit == -1)
     {
         shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, B00000000);
     }
