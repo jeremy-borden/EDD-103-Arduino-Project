@@ -228,8 +228,7 @@ void loop()
     //GAME
     if (gameState == GameState::Game)
     {
-    
-    }
+        }
     lcd.clear();
     FastLED.show();
 }
