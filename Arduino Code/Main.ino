@@ -43,17 +43,20 @@ byte sevenSegDigits[10] = {
 //Game
 enum class GameState
 {
-    Menu,
-    Game
+    MENU,
+    GAME
 };
 
-GameState gameState = GameState::Menu;
+GameState gameState = GameState::MENU;
 int menuScreen = 0;
 int selectedScreen = -1;
 boolean isPlaying = false;
 int patternArray[255];
 int numColors = 4;
 int timeToAnswer = 5;
+int roundNum = 0;
+int timeLeft = 0;
+int inputNum = 0;
 
 void setup()
 {
@@ -74,163 +77,18 @@ void setup()
 void loop()
 {
     inputUpdate();
-    //MENU
-    if (gameState == GameState::Menu)
+
+    if (gameState == GameState::MENU)
     {
-
-        switch (menuScreen)
-        {
-        case 0: // Play screen
-            lcd.setCursor(6, 0);
-            lcd.print("Play");
-            if (buttonPressed)
-            {
-                selectedScreen = 0;
-            }
-            break;
-        case 1: // Change color num screen
-            lcd.setCursor(2, 0);
-            lcd.print("# of Colors");
-            lcd.setCursor(7, 1);
-            lcd.print(numColors);
-            if (buttonPressed)
-            {
-                selectedScreen = 1;
-            }
-            break;
-        case 2: // Change time to answer screen
-            lcd.setCursor(2, 0);
-            lcd.print("Answer Time");
-            lcd.setCursor(7, 1);
-            if (timeToAnswer == 10)
-                lcd.print("INF");
-            else
-                lcd.print(timeToAnswer);
-            if (buttonPressed)
-            {
-                selectedScreen = 2;
-            }
-            break;
-        }
-
-        switch (selectedScreen) //this is disgusting. if you have time please fix this
-        {
-        case -1: //no screen is selected, allow player to scroll thru screens
-            if (menuScreen != 0)
-            {
-                lcd.setCursor(0, 0);
-                lcd.print("<");
-            }
-            if (menuScreen != 2)
-            {
-                lcd.setCursor(15, 0);
-                lcd.print(">");
-            }
-            if (joystickMoved)
-            {
-                if (joystickDirection == 1)
-                {
-                    menuScreen++;
-                    if (menuScreen > 2)
-                    {
-                        menuScreen = 2;
-                    }
-                }
-                else if (joystickDirection == 3)
-                {
-                    menuScreen--;
-                    if (menuScreen < 0)
-                    {
-                        menuScreen = 0;
-                    }
-                }
-            }
-            break;
-        case 0: //Selected play
-            for (int i = 0; i < 255; i++)
-            {
-                patternArray[i] = random(0, numColors - 1);
-            }
-            gameState = GameState::Game;
-            break;
-        case 1: //Selected color num
-            if (numColors != 2)
-            {
-                lcd.setCursor(6, 0);
-                lcd.print("<");
-            }
-            if (numColors != 12)
-            {
-                lcd.setCursor(9, 0);
-                lcd.print(">");
-            }
-            if (joystickMoved)
-            {
-                if (joystickDirection == 1)
-                {
-                    numColors++;
-                    if (numColors > 12)
-                    {
-                        numColors = 12;
-                    }
-                }
-                else if (joystickDirection == 3)
-                {
-                    numColors--;
-                    if (numColors < 2)
-                    {
-                        numColors = 2;
-                    }
-                }
-            }
-            if (buttonPressed)
-            {
-                selectedScreen = -1;
-            }
-            break;
-        case 2: //selected answer time
-            if (timeToAnswer != 3)
-            {
-                lcd.setCursor(6, 0);
-                lcd.print("<");
-            }
-            if (timeToAnswer != 10)
-            {
-                lcd.setCursor(9, 0);
-                lcd.print(">");
-            }
-            if (joystickMoved)
-            {
-                if (joystickDirection == 1)
-                {
-                    timeToAnswer--;
-                    if (timeToAnswer > 10)
-                    {
-                        timeToAnswer = 10;
-                    }
-                }
-                else if (joystickDirection == 3)
-                {
-                    timeToAnswer--;
-                    if (timeToAnswer < 3)
-                    {
-                        timeToAnswer = 3;
-                    }
-                }
-            }
-            if (buttonPressed)
-            {
-                selectedScreen = -1;
-            }
-            break;
-        }
+        menu();
     }
-    //GAME
-    if (gameState == GameState::Game)
+    if (gameState == GameState::GAME)
     {
-        }
+        game();
+    }
+
+    displayLEDs();
     lcd.clear();
-    FastLED.show();
 }
 
 //INPUT FUNCTIONS
@@ -248,10 +106,10 @@ void inputUpdate()
     joystickMoved = joystickMagnitude >= 0.5 && joystickReleased;
     joystickReleased = joystickMagnitude < 0.5;
 
-    joystickDirection = calculateJoystickDirection();
+    joystickDirection = getJoystickDirection();
 }
 
-int calculateJoystickDirection()
+int getJoystickDirection()
 {
     if (joystickMagnitude < 0.5)
     {
@@ -276,6 +134,9 @@ int calculateJoystickDirection()
     return 0;
 }
 
+int getSelectedColor()
+{
+}
 //DISPLAY FUNCTIONS
 void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 {
@@ -289,4 +150,177 @@ void displayDigit(int digit) // display digit on 7sd, -1 to clear display
         shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, sevenSegDigits[digit]);
     }
     digitalWrite(SSD_LATCH_PIN, HIGH);
+}
+
+//PROCESSES
+void menu()
+{
+    switch (menuScreen)
+    {
+    case 0: // Play screen
+        lcd.setCursor(6, 0);
+        lcd.print("Play");
+        if (buttonPressed)
+        {
+            selectedScreen = 0;
+        }
+        break;
+    case 1: // Change color num screen
+        lcd.setCursor(2, 0);
+        lcd.print("# of Colors");
+        lcd.setCursor(7, 1);
+        lcd.print(numColors);
+        if (buttonPressed)
+        {
+            selectedScreen = 1;
+        }
+        break;
+    case 2: // Change time to answer screen
+        lcd.setCursor(2, 0);
+        lcd.print("Answer Time");
+        lcd.setCursor(7, 1);
+        if (timeToAnswer == 10)
+            lcd.print("INF");
+        else
+            lcd.print(timeToAnswer);
+        if (buttonPressed)
+        {
+            selectedScreen = 2;
+        }
+        break;
+    }
+
+    switch (selectedScreen) //this is disgusting. if you have time please fix this
+    {
+    case -1: //no screen is selected, allow player to scroll thru screens
+        if (menuScreen != 0)
+        {
+            lcd.setCursor(0, 0);
+            lcd.print("<");
+        }
+        if (menuScreen != 2)
+        {
+            lcd.setCursor(15, 0);
+            lcd.print(">");
+        }
+        if (joystickMoved)
+        {
+            if (joystickDirection == 1)
+            {
+                menuScreen++;
+                if (menuScreen > 2)
+                {
+                    menuScreen = 2;
+                }
+            }
+            else if (joystickDirection == 3)
+            {
+                menuScreen--;
+                if (menuScreen < 0)
+                {
+                    menuScreen = 0;
+                }
+            }
+        }
+        break;
+    case 0: //Selected play
+        for (int i = 0; i < 255; i++)
+        {
+            patternArray[i] = random(0, numColors - 1);
+        }
+        gameState = GameState::GAME;
+        break;
+    case 1: //Selected color num
+        if (numColors != 2)
+        {
+            lcd.setCursor(6, 0);
+            lcd.print("<");
+        }
+        if (numColors != 12)
+        {
+            lcd.setCursor(9, 0);
+            lcd.print(">");
+        }
+        if (joystickMoved)
+        {
+            if (joystickDirection == 1)
+            {
+                numColors++;
+                if (numColors > 12)
+                {
+                    numColors = 12;
+                }
+            }
+            else if (joystickDirection == 3)
+            {
+                numColors--;
+                if (numColors < 2)
+                {
+                    numColors = 2;
+                }
+            }
+        }
+        if (buttonPressed)
+        {
+            selectedScreen = -1;
+        }
+        break;
+    case 2: //selected answer time
+        if (timeToAnswer != 3)
+        {
+            lcd.setCursor(6, 0);
+            lcd.print("<");
+        }
+        if (timeToAnswer != 10)
+        {
+            lcd.setCursor(9, 0);
+            lcd.print(">");
+        }
+        if (joystickMoved)
+        {
+            if (joystickDirection == 1)
+            {
+                timeToAnswer--;
+                if (timeToAnswer > 10)
+                {
+                    timeToAnswer = 10;
+                }
+            }
+            else if (joystickDirection == 3)
+            {
+                timeToAnswer--;
+                if (timeToAnswer < 3)
+                {
+                    timeToAnswer = 3;
+                }
+            }
+        }
+        if (buttonPressed)
+        {
+            selectedScreen = -1;
+        }
+        break;
+    }
+}
+
+void game() // use isPlaying to choose whether a pattern is showing or player is supposed to input
+{
+    /*
+    if is playing
+        start timer
+        if no input, continue to count down
+        if input, reset timer
+        if input, check if input color == array color at input number
+        if correct, continue, if incorrect, LOSE
+        if timer == 0, LOSE
+        if number of inputs so far != round number, continue prev
+        if number of inputs == round number, round number++,
+    if !isPlaying
+        run thru pattern up to round number
+    */
+}
+
+void displayLEDs() // use this to handle what the led strip should be doing
+{
+    FastLED.show();
 }
