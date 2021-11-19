@@ -329,16 +329,16 @@ void displayLEDs() // use this to handle what the led strip should be doing
 void test()
 {
     lcd.home();
-    //tone(BUZZER_PIN, 196, 4);
+    tone(BUZZER_PIN, 200);
     lcd.print("TEST_0123456789");
-    for (int i = 0; i < 10; i++)
-    {
-        displayDigit(i);
-        //delay(300);
-    }
+    digitalWrite(SSD_LATCH_PIN, LOW);
+    shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, B11111111);
+    digitalWrite(SSD_LATCH_PIN, HIGH);
+    delay(500);
     displayDigit(-1);
-    //delay(300);
     noTone(BUZZER_PIN);
+    delay(500);
+    
     if (digitalRead(BUTTON_PIN))
     {
         Serial.println("button down");
@@ -351,7 +351,7 @@ void test()
             LIST OF SHIT TO FIX
         -change 5v to ground on button
         -fix power cable
-        -fix contrast on lcd
+        -fix contrast on lcd (add 10k resistor in between wire)
         -fix top segment of 7sd
     */
 }
