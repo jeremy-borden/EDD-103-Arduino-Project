@@ -70,14 +70,15 @@ void setup()
     pinMode(SSD_LATCH_PIN, OUTPUT);
     pinMode(SSD_CLOCK_PIN, OUTPUT);
     pinMode(SSD_DATA_PIN, OUTPUT);
-
+    pinMode(BUTTON_PIN, INPUT);
     lcd.begin(16, 2);
 }
 
 void loop()
 {
     inputUpdate();
-
+    test();
+    /*
     if (gameState == GameState::MENU)
     {
         menu();
@@ -86,7 +87,7 @@ void loop()
     {
         game();
     }
-
+    */
     displayLEDs();
     lcd.clear();
 }
@@ -323,4 +324,34 @@ void game() // use isPlaying to choose whether a pattern is showing or player is
 void displayLEDs() // use this to handle what the led strip should be doing
 {
     FastLED.show();
+}
+
+void test()
+{
+    lcd.home();
+    //tone(BUZZER_PIN, 196, 4);
+    lcd.print("TEST_0123456789");
+    for (int i = 0; i < 10; i++)
+    {
+        displayDigit(i);
+        //delay(300);
+    }
+    displayDigit(-1);
+    //delay(300);
+    noTone(BUZZER_PIN);
+    if (digitalRead(BUTTON_PIN))
+    {
+        Serial.println("button down");
+    }
+    else
+    {
+        Serial.println("button up");
+    }
+    /*
+            LIST OF SHIT TO FIX
+        -change 5v to ground on button
+        -fix power cable
+        -fix contrast on lcd
+        -fix top segment of 7sd
+    */
 }
