@@ -9,9 +9,11 @@
 #define SSD_CLOCK_PIN 7
 #define SSD_DATA_PIN 5
 #define BUZZER_PIN 10
-#define ledPin 9
+#define LED_PIN 9
 
 #define NUM_LEDS 144
+#define INTERNAL_NUM_LEDS 60 //inner ring
+#define EXTERNAL_NUM_LEDS 60 //outer ring
 CRGB leds[NUM_LEDS];
 
 //input
@@ -40,6 +42,7 @@ byte sevenSegDigits[10] = {
     B11111011, // = 8
     B11001011  // = 9
 };
+
 //Game
 enum class GameState
 {
@@ -62,22 +65,22 @@ void setup()
 {
     Serial.begin(9600);
 
-    FastLED.addLeds<WS2812B, ledPin, GRB>(leds, NUM_LEDS);
+    FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, INTERNAL_NUM_LEDS);
+    FastLED.clear();
     FastLED.setBrightness(50);
-
-    randomSeed(analogRead(0));
+    lcd.begin(16, 2);
 
     pinMode(SSD_LATCH_PIN, OUTPUT);
     pinMode(SSD_CLOCK_PIN, OUTPUT);
     pinMode(SSD_DATA_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
-    lcd.begin(16, 2);
+    displayDigit(-1);
+    randomSeed(analogRead(0));
 }
 
 void loop()
 {
     inputUpdate();
-    //test();
 
     if (gameState == GameState::MENU)
     {
@@ -89,7 +92,10 @@ void loop()
     }
 
     displayLEDs();
-    lcd.clear();
+    EVERY_N_MILLIS(50)
+    {
+        lcd.clear(); //send data to lcd as buffer, only clear if data changes?
+    }
 }
 
 //INPUT FUNCTIONS
@@ -156,27 +162,19 @@ void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 //PROCESSES
 void menu()
 {
+    //have list of values for menu?
+
     switch (menuScreen)
     {
     case 0: // Play screen
         lcd.setCursor(6, 0);
         lcd.print("Play");
-        if (buttonPressed)
-        {
-            selectedScreen = 0;
-            return;
-        }
         break;
     case 1: // Change color num screen
         lcd.setCursor(2, 0);
         lcd.print("# of Colors");
         lcd.setCursor(7, 1);
         lcd.print(numColors);
-        if (buttonPressed)
-        {
-            selectedScreen = 1;
-            return;
-        }
         break;
     case 2: // Change time to answer screen
         lcd.setCursor(2, 0);
@@ -190,12 +188,12 @@ void menu()
         {
             lcd.print(timeToAnswer);
         }
-        if (buttonPressed)
-        {
-            selectedScreen = 2;
-            return;
-        }
         break;
+    }
+    if (buttonPressed && selectedScreen == -1)
+    {
+        selectedScreen = menuScreen;
+        return;
     }
 
     switch (selectedScreen) //this is disgusting. if you have time please fix this
@@ -268,11 +266,6 @@ void menu()
                 }
             }
         }
-        if (buttonPressed)
-        {
-            selectedScreen = -1;
-            return;
-        }
         break;
     case 2: //selected answer time
         if (timeToAnswer != 3)
@@ -289,7 +282,7 @@ void menu()
         {
             if (joystickDirection == 1)
             {
-                timeToAnswer--;
+                timeToAnswer++;
                 if (timeToAnswer > 10)
                 {
                     timeToAnswer = 10;
@@ -304,17 +297,24 @@ void menu()
                 }
             }
         }
-        if (buttonPressed)
-        {
-            selectedScreen = -1;
-            return;
-        }
         break;
+    }
+    if (buttonPressed && selectedScreen != -1)
+    {
+        selectedScreen = -1;
+        return;
     }
 }
 
 void game() // use isPlaying to choose whether a pattern is showing or player is supposed to input
 {
+    if (!isPlaying)
+    {
+    }
+
+    if (isPlaying)
+    {
+    }
     /*
     if is playing
         start timer
@@ -332,40 +332,19 @@ void game() // use isPlaying to choose whether a pattern is showing or player is
 
 void displayLEDs() // use this to handle what the led strip should be doing
 {
+    if (joystickMagnitude > 0.1)
+    {
+
+        int x = map(joystickAngle, 0, 359, 0, 59);
+        leds[x].setRGB(255, 255, 255);
+        if(x==59){
+            leds[0].setRGB(255, 255, 255);
+        }
+        if(x==0){
+            leds[59].setRGB(255, 255, 255);
+        }
+    }
+    blur1d(leds, INTERNAL_NUM_LEDS, 150);
+    fadeToBlackBy(leds, INTERNAL_NUM_LEDS, 50);
     FastLED.show();
-}
-
-void test()
-{
-    lcd.home();
-    //tone(BUZZER_PIN, 200);
-    lcd.print("TEST_0123456789");
-    digitalWrite(SSD_LATCH_PIN, LOW);
-    shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, B11111111);
-    digitalWrite(SSD_LATCH_PIN, HIGH);
-    delay(500);
-    displayDigit(-1);
-    noTone(BUZZER_PIN);
-    delay(500);
-
-    if (digitalRead(BUTTON_PIN))
-    {
-        Serial.println("button down");
-    }
-    else
-    {
-        Serial.println("button up");
-    }
-    for (int i = 0; i < 20; i++)
-    {
-        leds[i].setRGB(30, 30, 30);
-    }
-
-    /*
-            LIST OF SHIT TO FIX
-        -change 5v to ground on button
-        -fix power cable
-        -fix contrast on lcd (add 10k resistor in between wire)
-        -fix top segment of 7sd
-    */
 }
