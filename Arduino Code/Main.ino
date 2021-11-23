@@ -70,13 +70,14 @@ void setup()
     pinMode(SSD_LATCH_PIN, OUTPUT);
     pinMode(SSD_CLOCK_PIN, OUTPUT);
     pinMode(SSD_DATA_PIN, OUTPUT);
-
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
     lcd.begin(16, 2);
 }
 
 void loop()
 {
     inputUpdate();
+    //test();
 
     if (gameState == GameState::MENU)
     {
@@ -94,8 +95,8 @@ void loop()
 //INPUT FUNCTIONS
 void inputUpdate()
 {
-    buttonPressed = digitalRead(BUTTON_PIN) && buttonReleased;
-    buttonReleased = !digitalRead(BUTTON_PIN);
+    buttonPressed = !digitalRead(BUTTON_PIN) && buttonReleased;
+    buttonReleased = digitalRead(BUTTON_PIN);
 
     joystickX = map(analogRead(JOYSTICK_X_PIN), 0, 1023, -512, 512) / 512.0;
     joystickY = -map(analogRead(JOYSTICK_Y_PIN), 0, 1023, -512, 512) / 512.0;
@@ -163,6 +164,7 @@ void menu()
         if (buttonPressed)
         {
             selectedScreen = 0;
+            return;
         }
         break;
     case 1: // Change color num screen
@@ -173,6 +175,7 @@ void menu()
         if (buttonPressed)
         {
             selectedScreen = 1;
+            return;
         }
         break;
     case 2: // Change time to answer screen
@@ -180,12 +183,17 @@ void menu()
         lcd.print("Answer Time");
         lcd.setCursor(7, 1);
         if (timeToAnswer == 10)
+        {
             lcd.print("INF");
+        }
         else
+        {
             lcd.print(timeToAnswer);
+        }
         if (buttonPressed)
         {
             selectedScreen = 2;
+            return;
         }
         break;
     }
@@ -233,12 +241,12 @@ void menu()
     case 1: //Selected color num
         if (numColors != 2)
         {
-            lcd.setCursor(6, 0);
+            lcd.setCursor(6, 1);
             lcd.print("<");
         }
         if (numColors != 12)
         {
-            lcd.setCursor(9, 0);
+            lcd.setCursor(9, 1);
             lcd.print(">");
         }
         if (joystickMoved)
@@ -263,17 +271,18 @@ void menu()
         if (buttonPressed)
         {
             selectedScreen = -1;
+            return;
         }
         break;
     case 2: //selected answer time
         if (timeToAnswer != 3)
         {
-            lcd.setCursor(6, 0);
+            lcd.setCursor(6, 1);
             lcd.print("<");
         }
         if (timeToAnswer != 10)
         {
-            lcd.setCursor(9, 0);
+            lcd.setCursor(9, 1);
             lcd.print(">");
         }
         if (joystickMoved)
@@ -298,6 +307,7 @@ void menu()
         if (buttonPressed)
         {
             selectedScreen = -1;
+            return;
         }
         break;
     }
@@ -323,4 +333,39 @@ void game() // use isPlaying to choose whether a pattern is showing or player is
 void displayLEDs() // use this to handle what the led strip should be doing
 {
     FastLED.show();
+}
+
+void test()
+{
+    lcd.home();
+    //tone(BUZZER_PIN, 200);
+    lcd.print("TEST_0123456789");
+    digitalWrite(SSD_LATCH_PIN, LOW);
+    shiftOut(SSD_DATA_PIN, SSD_CLOCK_PIN, MSBFIRST, B11111111);
+    digitalWrite(SSD_LATCH_PIN, HIGH);
+    delay(500);
+    displayDigit(-1);
+    noTone(BUZZER_PIN);
+    delay(500);
+
+    if (digitalRead(BUTTON_PIN))
+    {
+        Serial.println("button down");
+    }
+    else
+    {
+        Serial.println("button up");
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        leds[i].setRGB(30, 30, 30);
+    }
+
+    /*
+            LIST OF SHIT TO FIX
+        -change 5v to ground on button
+        -fix power cable
+        -fix contrast on lcd (add 10k resistor in between wire)
+        -fix top segment of 7sd
+    */
 }
