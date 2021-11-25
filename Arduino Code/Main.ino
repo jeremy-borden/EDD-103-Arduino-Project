@@ -14,13 +14,15 @@
 #define NUM_LEDS 144
 #define INTERNAL_NUM_LEDS 60 //inner ring
 #define EXTERNAL_NUM_LEDS 60 //outer ring
-CRGB leds[NUM_LEDS];
+
+CRGBArray<NUM_LEDS> leds;
 
 //input
+#define JOYSTICK_DEADZONE 0.2
 double joystickX = 0;
 double joystickY = 0;
-int joystickAngle = 0;
 double joystickMagnitude = 0;
+int joystickAngle = 0;
 int joystickDirection = 0;
 
 bool buttonPressed = false;
@@ -53,21 +55,33 @@ enum class GameState
 GameState gameState = GameState::MENU;
 int menuScreen = 0;
 int selectedScreen = -1;
-boolean isPlaying = false;
-int patternArray[255];
+boolean isPlayerTurn = false;
+int patternList[255];
 int numColors = 4;
 int timeToAnswer = 5;
-int roundNum = 0;
+int roundNum = 1;
 int timeLeft = 0;
 int inputNum = 0;
+boolean playerLose = false;
+
+CRGB colorList[] = {
+    CRGB::MediumBlue, CRGB::Red, CRGB::ForestGreen, CRGB::Yellow,         //
+    CRGB::DarkOrchid, CRGB::DarkOrange, CRGB::Fuchsia, CRGB::GreenYellow, //
+    CRGB::Cyan, CRGB::Maroon, CRGB::Teal, CRGB::MidnightBlue};
+
+boolean colorActiveList[12]; //true if color should be bright
+
+#define MAX_BUZZER_FREQ 1300
+#define MIN_BUZZER_FREQ 100
+int buzzerToneList[12]; //corresponds to each color
 
 void setup()
 {
     Serial.begin(9600);
-
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, INTERNAL_NUM_LEDS);
     FastLED.clear();
-    FastLED.setBrightness(50);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 3000);
+    //FastLED.setBrightness(50);
     lcd.begin(16, 2);
 
     pinMode(SSD_LATCH_PIN, OUTPUT);
@@ -141,9 +155,6 @@ int getJoystickDirection()
     return 0;
 }
 
-int getSelectedColor()
-{
-}
 //DISPLAY FUNCTIONS
 void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 {
@@ -230,9 +241,14 @@ void menu()
         }
         break;
     case 0: //Selected play
-        for (int i = 0; i < 255; i++)
+        for (int i = 0; i < 255; i++)//fill pattern list
         {
-            patternArray[i] = random(0, numColors - 1);
+            patternList[i] = random(0, numColors - 1);
+        }
+        for (int i = 0; i < numColors; i++)//fill buzzer tone list
+        {
+            int step = (MAX_BUZZER_FREQ - MIN_BUZZER_FREQ) / (numColors - 1);
+            buzzerToneList[i] = MIN_BUZZER_FREQ + (step * i);
         }
         gameState = GameState::GAME;
         break;
@@ -306,45 +322,126 @@ void menu()
     }
 }
 
-void game() // use isPlaying to choose whether a pattern is showing or player is supposed to input
+void game() // use isPlayerTurn to choose whether a pattern is showing or player is supposed to input
 {
-    if (!isPlaying)
+    if (!isPlayerTurn)
     {
+        //make boolean list of color states?
+
+        EVERY_N_MILLIS(500)
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                colorActiveList[i] = false;
+            }
+            if (inputNum > roundNum)
+            {
+                inputNum = 0;
+                isPlayerTurn = true;
+                timeLeft = timeToAnswer;
+                return;
+            }
+            colorActiveList[patternList[inputNum]] = true;
+            //play sound
+            inputNum++;
+        }
     }
 
-    if (isPlaying)
+    if (isPlayerTurn)
     {
+        EVERY_N_SECONDS(1)
+        {
+            timeLeft--;
+            if (timeLeft < 0)
+            {
+                playerLose = true;
+            }
+        }
+        //light up section player is pointing to
+        for (int i = 0; i < 12; i++)
+        {
+            colorActiveList[i] = false;
+        }
+        if (joystickMagnitude > JOYSTICK_DEADZONE)
+        {
+            colorActiveList[getJoystickColorIndex()] = true;
+        }
+
+        int input = getInput();
+
+        if (input != NULL)
+        {
+            if (input == patternList[inputNum])
+            {
+                inputNum++;
+                timeLeft = timeToAnswer;
+                //play a sound
+            }
+            else
+            {
+                playerLose = true;
+            }
+        }
+
+        if (inputNum >= roundNum)
+        {
+            roundNum++;
+            inputNum = 0;
+            isPlayerTurn = false;
+        }
     }
-    /*
-    if is playing
-        start timer
-        if no input, continue to count down
-        if input, reset timer
-        if input, check if input color == array color at input number
-        if correct, continue, if incorrect, LOSE
-        if timer == 0, LOSE
-        if number of inputs so far != round number, continue prev
-        if number of inputs == round number, round number++,
-    if !isPlaying
-        run thru pattern up to round number
-    */
 }
 
 void displayLEDs() // use this to handle what the led strip should be doing
 {
-    if (joystickMagnitude > 0.1)
-    {
-
-        int x = map(joystickAngle, 0, 359, 0, 59);
-        leds[x].setRGB(255, 255, 255);
-        if(x==59){
-            leds[0].setRGB(255, 255, 255);
-        }
-        if(x==0){
-            leds[59].setRGB(255, 255, 255);
+    //display outer ring of colors
+    for (int i = 0; i < numColors; i++)
+    { //FIX BOUNDS LATER
+        int startLed = i / ((double)numColors) * EXTERNAL_NUM_LEDS;
+        int numLedsInSection = EXTERNAL_NUM_LEDS / numColors;
+        int endLed = startLed + numLedsInSection - 1;
+        fill_solid(leds(startLed, endLed), numLedsInSection, colorList[i]);
+        if (!colorActiveList[i])
+        { // if the color is not "active" dim it a bit
+            leds(startLed, endLed).fadeLightBy(128);
         }
     }
-    blur1d(leds, INTERNAL_NUM_LEDS, 150);
-    fadeToBlackBy(leds, INTERNAL_NUM_LEDS, 50);
+
+    //inner ring selection
+    if (joystickMagnitude > JOYSTICK_DEADZONE)
+    {
+        int x = map(joystickAngle, 0, 359, 0, INTERNAL_NUM_LEDS - 1);
+        CRGB colorPointedAt = colorList[getJoystickColorIndex()];
+        //fade color by joystick magnitude?
+        leds[(x + 2) % INTERNAL_NUM_LEDS] = colorPointedAt;
+        leds[(x + 1) % INTERNAL_NUM_LEDS] = colorPointedAt;
+        leds[x] = colorPointedAt;
+        leds[(x - 1) % INTERNAL_NUM_LEDS] = colorPointedAt;
+        leds[(x - 2) % INTERNAL_NUM_LEDS] = colorPointedAt;
+
+        leds[(x + 2) % INTERNAL_NUM_LEDS].fadeLightBy(192);
+        leds[(x + 1) % INTERNAL_NUM_LEDS].fadeLightBy(64);
+        leds[(x - 1) % INTERNAL_NUM_LEDS].fadeLightBy(64);
+        leds[(x - 2) % INTERNAL_NUM_LEDS].fadeLightBy(192);
+    }
+    leds(EXTERNAL_NUM_LEDS, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
     FastLED.show();
+}
+
+int getJoystickColorIndex() //get color joystick is pointing to;
+{
+    return (int)((joystickAngle)*numColors / 360);
+}
+
+int getInput()
+{ //get color player selected, null if none has been selected
+
+    if (joystickMagnitude > JOYSTICK_DEADZONE && buttonPressed)
+    {
+        return getJoystickColorIndex();
+    }
+    else
+    {
+        return NULL;
+    }
 }
