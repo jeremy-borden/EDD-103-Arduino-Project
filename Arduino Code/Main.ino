@@ -1,3 +1,4 @@
+#include <arduino-timer.h>
 #include <LiquidCrystal_74HC595.h>
 #include <FastLED.h>
 
@@ -56,7 +57,7 @@ GameState gameState = GameState::MENU;
 int menuScreen = 0;
 int selectedScreen = -1;
 boolean isPlayerTurn = false;
-int patternList[255];
+int patternList[127];
 int numColors = 4;
 int timeToAnswer = 5;
 int roundNum = 1;
@@ -70,10 +71,12 @@ CRGB colorList[] = {
     CRGB::Cyan, CRGB::Maroon, CRGB::Teal, CRGB::MidnightBlue};
 
 boolean colorActiveList[12]; //true if color should be bright
+Timer<3, millis, int> timerColor;
 
 #define MAX_BUZZER_FREQ 1300
 #define MIN_BUZZER_FREQ 100
-int buzzerToneList[12]; //corresponds to each color
+auto timer = timer_create_default(); //timer for buzzer
+int buzzerToneList[12];              //corresponds to each color
 
 void setup()
 {
@@ -105,6 +108,7 @@ void loop()
         game();
     }
 
+    timer.tick();
     displayLEDs();
     EVERY_N_MILLIS(50)
     {
@@ -240,12 +244,12 @@ void menu()
             }
         }
         break;
-    case 0: //Selected play
-        for (int i = 0; i < 255; i++)//fill pattern list
+    case 0:                           //Selected play
+        for (int i = 0; i < 127; i++) //fill pattern list
         {
-            patternList[i] = random(0, numColors - 1);
+            patternList[i] = random8(numColors - 1);
         }
-        for (int i = 0; i < numColors; i++)//fill buzzer tone list
+        for (int i = 0; i < numColors; i++) //fill buzzer tone list
         {
             int step = (MAX_BUZZER_FREQ - MIN_BUZZER_FREQ) / (numColors - 1);
             buzzerToneList[i] = MIN_BUZZER_FREQ + (step * i);
@@ -375,6 +379,11 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
             {
                 inputNum++;
                 timeLeft = timeToAnswer;
+                noTone(BUZZER_PIN);
+                tone(BUZZER_PIN, buzzerToneList[input]);
+                colorActiveList[input] = true;
+                timerColor.in(200, disableSection, input);
+                timer.in(200, stopBuzzer);
                 //play a sound
             }
             else
@@ -444,4 +453,17 @@ int getInput()
     {
         return NULL;
     }
+}
+
+bool stopBuzzer(void *)
+{
+    noTone(BUZZER_PIN);
+    return false; // to repeat the action - false to stop
+}
+
+bool disableSection(int section)
+{
+    int sectionNum = (int)section;
+    colorActiveList[sectionNum] = false;
+    return false;
 }
