@@ -50,9 +50,10 @@ byte sevenSegDigits[10] = {
 enum class GameState
 {
     MENU,
-    GAME
+    GAME,
+    LOSE
 };
-
+auto timer = timer_create_default();
 GameState gameState = GameState::MENU;
 int menuScreen = 0;
 int selectedScreen = -1;
@@ -72,11 +73,11 @@ CRGB colorList[] = {
 
 boolean colorActiveList[12]; //true if color should be bright
 Timer<3, millis, int> timerColor;
-
+Timer<8, millis, int> timerTone;
 #define MAX_BUZZER_FREQ 1300
 #define MIN_BUZZER_FREQ 100
-auto timer = timer_create_default(); //timer for buzzer
-int buzzerToneList[12];              //corresponds to each color
+//timer for buzzer
+int buzzerToneList[12]; //corresponds to each color
 
 void setup()
 {
@@ -106,6 +107,9 @@ void loop()
     if (gameState == GameState::GAME)
     {
         game();
+    }
+    if (gameState == GameState::LOSE)
+    {
     }
 
     timer.tick();
@@ -260,12 +264,12 @@ void menu()
         if (numColors != 2)
         {
             lcd.setCursor(6, 1);
-            lcd.print("<");
+            lcd.print(F("<"));
         }
         if (numColors != 12)
         {
             lcd.setCursor(9, 1);
-            lcd.print(">");
+            lcd.print(F(">"));
         }
         if (joystickMoved)
         {
@@ -291,7 +295,7 @@ void menu()
         if (timeToAnswer != 3)
         {
             lcd.setCursor(6, 1);
-            lcd.print("<");
+            lcd.print(F("<"));
         }
         if (timeToAnswer != 10)
         {
@@ -330,7 +334,6 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
 {
     if (!isPlayerTurn)
     {
-        //make boolean list of color states?
 
         EVERY_N_MILLIS(500)
         {
@@ -401,6 +404,19 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
     }
 }
 
+void lose()
+{
+    leds.fill_solid(CRGB::Red);
+
+    tone(BUZZER_PIN, 400, 250);
+    timerTone.in(250, playTone, 300);
+    timerTone.in(500, playTone, 200);
+    timerTone.in(750, playTone, 100);
+    timerTone.in(1000, playTone, 200);
+    timerTone.in(1250, playTone, 100);
+    timer.in(1500, resetGame);
+}
+
 void displayLEDs() // use this to handle what the led strip should be doing
 {
     //display outer ring of colors
@@ -461,9 +477,30 @@ bool stopBuzzer(void *)
     return false; // to repeat the action - false to stop
 }
 
+bool playTone(int frequency)
+{
+    tone(BUZZER_PIN, frequency, 250);
+    return false;
+}
+
 bool disableSection(int section)
 {
     int sectionNum = (int)section;
     colorActiveList[sectionNum] = false;
+    return false;
+}
+
+bool resetGame(void *)
+{
+    menuScreen = 0;
+    selectedScreen = -1;
+    roundNum = 1;
+    timeLeft = 0;
+    inputNum = 0;
+    isPlayerTurn = false;
+    timerColor.empty();
+    timerTone.empty();
+    timer.empty();
+    gameState = GameState::MENU;
     return false;
 }
