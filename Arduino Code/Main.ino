@@ -12,11 +12,10 @@
 #define BUZZER_PIN 10
 #define LED_PIN 9
 
-#define NUM_LEDS 144
 #define INTERNAL_NUM_LEDS 60 //inner ring
-#define EXTERNAL_NUM_LEDS 60 //outer ring
+#define EXTERNAL_NUM_LEDS 84 //outer ring
 
-CRGBArray<NUM_LEDS> leds;
+CRGBArray<INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS> leds;
 
 //input
 #define JOYSTICK_DEADZONE 0.2
@@ -82,7 +81,7 @@ int buzzerToneList[12]; //corresponds to each color
 void setup()
 {
     Serial.begin(9600);
-    FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, INTERNAL_NUM_LEDS);
+    FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS);
     FastLED.clear();
     FastLED.setMaxPowerInVoltsAndMilliamps(5, 3000);
     //FastLED.setBrightness(50);
@@ -438,18 +437,18 @@ void displayLEDs() // use this to handle what the led strip should be doing
         int x = map(joystickAngle, 0, 359, 0, INTERNAL_NUM_LEDS - 1);
         CRGB colorPointedAt = colorList[getJoystickColorIndex()];
         //fade color by joystick magnitude?
-        leds[(x + 2) % INTERNAL_NUM_LEDS] = colorPointedAt;
-        leds[(x + 1) % INTERNAL_NUM_LEDS] = colorPointedAt;
-        leds[x] = colorPointedAt;
-        leds[(x - 1) % INTERNAL_NUM_LEDS] = colorPointedAt;
-        leds[(x - 2) % INTERNAL_NUM_LEDS] = colorPointedAt;
+        leds[(x + 2) % (INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[(x + 1) % (INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[x + EXTERNAL_NUM_LEDS] = colorPointedAt;
+        leds[(x - 1) % (INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[(x - 2) % (INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS)] = colorPointedAt;
 
-        leds[(x + 2) % INTERNAL_NUM_LEDS].fadeLightBy(192);
-        leds[(x + 1) % INTERNAL_NUM_LEDS].fadeLightBy(64);
-        leds[(x - 1) % INTERNAL_NUM_LEDS].fadeLightBy(64);
-        leds[(x - 2) % INTERNAL_NUM_LEDS].fadeLightBy(192);
+        leds[((x + 2) % INTERNAL_NUM_LEDS) + EXTERNAL_NUM_LEDS].fadeLightBy(192);
+        leds[((x + 1) % INTERNAL_NUM_LEDS) + EXTERNAL_NUM_LEDS].fadeLightBy(64);
+        leds[((x - 1) % INTERNAL_NUM_LEDS) + EXTERNAL_NUM_LEDS].fadeLightBy(64);
+        leds[((x - 2) % INTERNAL_NUM_LEDS) + EXTERNAL_NUM_LEDS].fadeLightBy(192);
     }
-    leds(EXTERNAL_NUM_LEDS, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
+    leds(INTERNAL_NUM_LEDS, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
     FastLED.show();
 }
 
