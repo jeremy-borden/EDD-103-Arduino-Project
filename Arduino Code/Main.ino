@@ -19,11 +19,11 @@ CRGBArray<INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS> leds;
 
 //input
 #define JOYSTICK_DEADZONE 0.2
-double joystickX = 0;
-double joystickY = 0;
-double joystickMagnitude = 0;
-int joystickAngle = 0;
-int joystickDirection = 0;
+float joystickX = 0;
+float joystickY = 0;
+float joystickMagnitude = 0;
+int joystickAngle = 0; // change to uint_t
+int8_t joystickDirection = 0;
 
 bool buttonPressed = false;
 bool buttonReleased = true;
@@ -55,24 +55,24 @@ enum class GameState
 
 auto timer = timer_create_default();
 GameState gameState = GameState::MENU;
-int menuScreen = 0;
-int selectedScreen = -1;
-boolean isPlayerTurn = false;
-int patternList[100];
-int numColors = 4;
-int timeToAnswer = 5;
-int roundNum = 1;
-int timeLeft = 0;
-int inputNum = 0;
+int8_t menuScreen = 0;
+int8_t selectedScreen = -1;
+bool isPlayerTurn = false;
+int8_t patternList[100];
+int8_t numColors = 4;
+int8_t timeToAnswer = 5;
+int8_t roundNum = 1;
+int8_t timeLeft = 0;
+int8_t inputNum = 0;
 
 CRGB colorList[] = {
     CRGB::MediumBlue, CRGB::Red, CRGB::ForestGreen, CRGB::Yellow,         //
     CRGB::DarkOrchid, CRGB::DarkOrange, CRGB::Fuchsia, CRGB::GreenYellow, //
     CRGB::Cyan, CRGB::Maroon, CRGB::Teal, CRGB::MidnightBlue};
 
-boolean colorActiveList[12]; //true if color should be bright
+bool colorActiveList[12]; //true if color should be bright
 
-Timer<3, millis, int> timerColor;
+Timer<3, millis, uint8_t> timerColor;
 Timer<8, millis, int> timerTone;
 #define MAX_BUZZER_FREQ 1300
 #define MIN_BUZZER_FREQ 100
@@ -427,10 +427,10 @@ void displayLEDs() // use this to handle what the led strip should be doing
         int startLed = i / ((double)numColors) * EXTERNAL_NUM_LEDS;
         int numLedsInSection = EXTERNAL_NUM_LEDS / numColors;
         int endLed = startLed + numLedsInSection - 1;
-        fill_solid(leds(startLed, endLed), numLedsInSection, colorList[i]);
+        fill_solid(leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed), numLedsInSection, colorList[i]);
         if (!colorActiveList[i])
         { // if the color is not "active" dim it a bit
-            leds(startLed, endLed).fadeLightBy(128);
+            leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed).fadeLightBy(128);
         }
     }
 
@@ -440,18 +440,18 @@ void displayLEDs() // use this to handle what the led strip should be doing
         int x = map(joystickAngle, 0, 359, 0, INTERNAL_NUM_LEDS - 1);
         CRGB colorPointedAt = colorList[getJoystickColorIndex()];
         //fade color by joystick magnitude?
-        leds[EXTERNAL_NUM_LEDS + ((x + 2) % INTERNAL_NUM_LEDS)] = colorPointedAt;
-        leds[EXTERNAL_NUM_LEDS + ((x + 1) % INTERNAL_NUM_LEDS)] = colorPointedAt;
-        leds[EXTERNAL_NUM_LEDS + x] = colorPointedAt;
-        leds[EXTERNAL_NUM_LEDS + ((x - 1) % INTERNAL_NUM_LEDS)] = colorPointedAt;
-        leds[EXTERNAL_NUM_LEDS + ((x - 2) % INTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[((x + 2) % INTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[((x + 1) % INTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[x] = colorPointedAt;
+        leds[((x - 1) % INTERNAL_NUM_LEDS)] = colorPointedAt;
+        leds[((x - 2) % INTERNAL_NUM_LEDS)] = colorPointedAt;
 
-        leds[EXTERNAL_NUM_LEDS + ((x + 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
-        leds[EXTERNAL_NUM_LEDS + ((x + 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
-        leds[EXTERNAL_NUM_LEDS + ((x - 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
-        leds[EXTERNAL_NUM_LEDS + ((x - 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
+        leds[((x + 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
+        leds[((x + 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
+        leds[((x - 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
+        leds[((x - 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
     }
-    leds(INTERNAL_NUM_LEDS, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
+    leds(0, INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
 
     FastLED.show();
 }
@@ -486,9 +486,9 @@ bool playTone(int frequency)
     return false;
 }
 
-bool disableSection(int section)
+bool disableSection(uint8_t section)
 {
-    int sectionNum = (int)section;
+    uint8_t sectionNum = (uint8_t)section;
     colorActiveList[sectionNum] = false;
     return false;
 }
