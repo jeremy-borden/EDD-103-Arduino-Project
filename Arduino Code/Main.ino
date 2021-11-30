@@ -25,14 +25,14 @@ float joystickMagnitude = 0;
 int joystickAngle = 0; // change to uint_t
 int8_t joystickDirection = 0;
 
-bool buttonPressed = false;
-bool buttonReleased = true;
-bool joystickMoved = false;
-bool joystickReleased = true;
+bool buttonPressed;
+bool buttonReleased;
+bool joystickMoved;
+bool joystickReleased;
 
 LiquidCrystal_74HC595 lcd(11, 13, 12, 1, 3, 4, 5, 6, 7);
 
-byte sevenSegDigits[10] = {
+const byte sevenSegDigits[10] = {
     B01111011, // = 0
     B00001001, // = 1
     B10110011, // = 2
@@ -54,19 +54,19 @@ enum class GameState
 };
 
 auto timer = timer_create_default();
-GameState gameState = GameState::MENU;
-int8_t menuScreen = 0;
-int8_t selectedScreen = -1;
-bool isPlayerTurn = false;
+GameState gameState;
+int8_t menuScreen;
+int8_t selectedScreen;
+bool isPlayerTurn;
 int8_t patternList[100];
-int8_t numColors = 4;
-int8_t timeToAnswer = 5;
-int8_t roundNum = 1;
-int8_t timeLeft = 0;
-int8_t inputNum = 0;
+int8_t numColors;
+int8_t timeToAnswer;
+int8_t roundNum;
+int8_t timeLeft;
+int8_t inputNum;
 
-CRGB colorList[] = {
-    CRGB::MediumBlue, CRGB::Red, CRGB::ForestGreen, CRGB::Yellow,         //
+const CRGB colorList[] = {
+    CRGB::Blue, CRGB::Red, CRGB::Green, CRGB::Yellow,                     //
     CRGB::DarkOrchid, CRGB::DarkOrange, CRGB::Fuchsia, CRGB::GreenYellow, //
     CRGB::Cyan, CRGB::Maroon, CRGB::Teal, CRGB::MidnightBlue};
 
@@ -76,49 +76,64 @@ Timer<3, millis, uint8_t> timerColor;
 Timer<8, millis, int> timerTone;
 #define MAX_BUZZER_FREQ 2000
 #define MIN_BUZZER_FREQ 1000
-//timer for buzzer
 int buzzerToneList[12]; //corresponds to each color
+
+/*
+TODO:
+    ! REPLACE ACTIVE BUZZER WITH PASSIVE BUZZER
+    ! CALIBRATE LIGHTS/JOYSTICK
+    ! DISPLAY ROUND NUMBER ON LCD
+    ! DISPLAY TIME LEFT ON 7 SEGMENT DISPLAY
+    ! FIX MENU NOT WORKING
+    
+    ? CHANGE JOYSTICK ANGLE AND MAGNITUDE TO uint8_t
+    ? HIGH SCORE
+    ? GET RID ON ENUM CLASS FOR GAMESTATE AND CHANGE TO VARIABLE
+    ? ADD BETTER LIGHTING AND SOUND EFFECTS
+    ? CHANGE MENU SYSTEM TO 2D ARRAY OF TITLE AND VALUES (MENU = { {TITLE, VALUE}, {TITLE, VALUE} }
+*/
 
 void setup()
 {
     Serial.begin(9600);
+
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, EXTERNAL_NUM_LEDS + INTERNAL_NUM_LEDS);
     FastLED.clear();
     FastLED.setMaxPowerInVoltsAndMilliamps(5, 3000);
-    //FastLED.setBrightness(50);
+
     lcd.begin(16, 2);
 
     pinMode(SSD_LATCH_PIN, OUTPUT);
     pinMode(SSD_CLOCK_PIN, OUTPUT);
     pinMode(SSD_DATA_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
-    displayDigit(-1);
-    randomSeed(analogRead(5));
-    
+
+    randomSeed(analogRead(A5));
+    timer.in(0, resetGame);
 }
 
 void loop()
 {
     inputUpdate();
-    
-    if (gameState == GameState::MENU)
+
+    switch (gameState)
     {
+    case GameState::MENU:
         menu();
-    }
-    if (gameState == GameState::GAME)
-    {
+        break;
+    case GameState::GAME:
         game();
-    }
-    if (gameState == GameState::LOSE)
-    {
+        break;
+    case GameState::LOSE:
         lose();
+        break;
     }
 
     timer.tick();
     displayLEDs();
     EVERY_N_MILLIS(50)
     {
-        lcd.clear(); //send data to lcd as buffer, only clear if data changes?
+        lcd.clear();
     }
 }
 
@@ -128,8 +143,8 @@ void inputUpdate()
     buttonPressed = !digitalRead(BUTTON_PIN) && buttonReleased;
     buttonReleased = digitalRead(BUTTON_PIN);
 
-    joystickX = map(analogRead(JOYSTICK_X_PIN), 0, 1023, -512, 512) / 512.0;
-    joystickY = -map(analogRead(JOYSTICK_Y_PIN), 0, 1023, -512, 512) / 512.0;
+    joystickX = map(analogRead(JOYSTICK_X_PIN), 0, 1023, -512, 512) / 512.0f;
+    joystickY = -map(analogRead(JOYSTICK_Y_PIN), 0, 1023, -512, 512) / 512.0f;
 
     joystickAngle = (int)(degrees(atan2(-joystickY, -joystickX)) + 180) % 360;
     joystickMagnitude = sqrt(sq(joystickY * sqrt(1.0 - (joystickX * joystickX * .5))) + sq(joystickX * sqrt(1.0 - (joystickY * joystickY * .5))));
@@ -140,29 +155,32 @@ void inputUpdate()
     joystickDirection = getJoystickDirection();
 }
 
-int getJoystickDirection()
+int8_t getJoystickDirection()
 {
     if (joystickMagnitude < 0.5)
     {
         return 0; //CENTER
     }
-    if (joystickAngle < 45 || joystickAngle > 315)
+    else if (joystickAngle > 315 || joystickAngle <= 45)
     {
         return 1; //RIGHT
     }
-    if (joystickAngle > 45 && joystickAngle < 135)
+    else if (joystickAngle > 45 && joystickAngle <= 135)
     {
         return 2; //UP
     }
-    if (joystickAngle > 135 && joystickAngle < 225)
+    else if (joystickAngle > 135 && joystickAngle <= 225)
     {
         return 3; //LEFT
     }
-    if (joystickAngle > 225 && joystickAngle < 315)
+    else if (joystickAngle > 225 && joystickAngle <= 315)
     {
         return 4; //DOWN
     }
-    return 0;
+    else
+    {
+        return 0;
+    }
 }
 
 //DISPLAY FUNCTIONS
@@ -183,38 +201,40 @@ void displayDigit(int digit) // display digit on 7sd, -1 to clear display
 //PROCESSES
 void menu()
 {
-    //have list of values for menu?
+    if (selectedScreen == -1)
+    {
 
-    switch (menuScreen)
-    {
-    case 0: // Play screen
-        lcd.setCursor(6, 0);
-        lcd.print(F("Play"));
-        break;
-    case 1: // Change color num screen
-        lcd.setCursor(2, 0);
-        lcd.print(F("# of Colors"));
-        lcd.setCursor(7, 1);
-        lcd.print(numColors);
-        break;
-    case 2: // Change time to answer screen
-        lcd.setCursor(2, 0);
-        lcd.print(F("Answer Time"));
-        lcd.setCursor(7, 1);
-        if (timeToAnswer == 10)
+        switch (menuScreen)
         {
-            lcd.print(F("INF"));
+        case 0: // Play screen
+            lcd.setCursor(6, 0);
+            lcd.print(F("Play"));
+            break;
+        case 1: // Change color num screen
+            lcd.setCursor(2, 0);
+            lcd.print(F("# of Colors"));
+            lcd.setCursor(7, 1);
+            lcd.print(numColors);
+            break;
+        case 2: // Change time to answer screen
+            lcd.setCursor(2, 0);
+            lcd.print(F("Answer Time"));
+            lcd.setCursor(7, 1);
+            if (timeToAnswer == 10)
+            {
+                lcd.print(F("INF"));
+            }
+            else
+            {
+                lcd.print(timeToAnswer);
+            }
+            break;
         }
-        else
+        if (buttonPressed && selectedScreen == -1)
         {
-            lcd.print(timeToAnswer);
+            selectedScreen = menuScreen;
+            return;
         }
-        break;
-    }
-    if (buttonPressed && selectedScreen == -1)
-    {
-        selectedScreen = menuScreen;
-        return;
     }
 
     switch (selectedScreen) //this is disgusting. if you have time please fix this
@@ -253,7 +273,7 @@ void menu()
     case 0:                           //Selected play
         for (int i = 0; i < 100; i++) //fill pattern list
         {
-            patternList[i] = random(numColors - 1);
+            patternList[i] = random(0, numColors - 1);
         }
         for (int i = 0; i < numColors; i++) //fill buzzer tone list
         {
@@ -358,24 +378,28 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
 
     if (isPlayerTurn)
     {
-        EVERY_N_SECONDS(1)
+        if (timeToAnswer != 10)
         {
-            timeLeft--;
-            if (timeLeft < 0)
+            EVERY_N_SECONDS(1)
             {
-                gameState = GameState::LOSE;
-                return;
+                timeLeft--;
+                if (timeLeft < 0)
+                {
+                    gameState = GameState::LOSE;
+                    return;
+                }
             }
         }
+
         //light up section player is pointing to
-        for (int i = 0; i < 12; i++)
-        {
-            colorActiveList[i] = false;
-        }
-        if (joystickMagnitude > JOYSTICK_DEADZONE)
-        {
-            colorActiveList[getJoystickColorIndex()] = true;
-        }
+        // for (int i = 0; i < 12; i++)
+        // {
+        //     colorActiveList[i] = false;
+        // }
+        // if (joystickMagnitude > JOYSTICK_DEADZONE)
+        // {
+        //     colorActiveList[getJoystickColorIndex()] = true;
+        // }
 
         int input = getInput();
 
@@ -390,7 +414,6 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
                 colorActiveList[input] = true;
                 timerColor.in(200, disableSection, input);
                 timer.in(200, stopBuzzer);
-                //play a sound
             }
             else
             {
@@ -460,11 +483,11 @@ void displayLEDs() // use this to handle what the led strip should be doing
 
 int getJoystickColorIndex() //get color joystick is pointing to;
 {
-    return (int)((joystickAngle)*numColors / 360);
+    return (int)(joystickAngle * numColors / 360.0f);
 }
 
 int getInput()
-{ //get color player selected, -1 if none has been selected
+{ //get color player selected, -1 if none has 5been selected
 
     if (joystickMagnitude > JOYSTICK_DEADZONE && buttonPressed)
     {
@@ -484,14 +507,13 @@ bool stopBuzzer(void *)
 
 bool playTone(int frequency)
 {
-    tone(BUZZER_PIN, frequency, 250);
+    tone(BUZZER_PIN, frequency, 200);
     return false;
 }
 
 bool disableSection(uint8_t section)
 {
-    uint8_t sectionNum = (uint8_t)section;
-    colorActiveList[sectionNum] = false;
+    colorActiveList[section] = false;
     return false;
 }
 
@@ -503,6 +525,7 @@ bool resetGame(void *)
     timeLeft = 0;
     inputNum = 0;
     isPlayerTurn = false;
+    displayDigit(-1);
     timerColor.empty();
     timerTone.empty();
     timer.empty();
