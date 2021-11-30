@@ -12,8 +12,8 @@
 #define BUZZER_PIN 10
 #define LED_PIN 9
 
-#define INTERNAL_NUM_LEDS 60 //inner ring
-#define EXTERNAL_NUM_LEDS 84 //outer ring
+#define INTERNAL_NUM_LEDS 67 //inner ring
+#define EXTERNAL_NUM_LEDS 76 //outer ring
 
 CRGBArray<INTERNAL_NUM_LEDS + EXTERNAL_NUM_LEDS> leds;
 
@@ -74,8 +74,8 @@ bool colorActiveList[12]; //true if color should be bright
 
 Timer<3, millis, uint8_t> timerColor;
 Timer<8, millis, int> timerTone;
-#define MAX_BUZZER_FREQ 1300
-#define MIN_BUZZER_FREQ 100
+#define MAX_BUZZER_FREQ 2000
+#define MIN_BUZZER_FREQ 1000
 //timer for buzzer
 int buzzerToneList[12]; //corresponds to each color
 
@@ -93,13 +93,14 @@ void setup()
     pinMode(SSD_DATA_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     displayDigit(-1);
-    randomSeed(analogRead(0));
+    randomSeed(analogRead(5));
+    
 }
 
 void loop()
 {
     inputUpdate();
-
+    
     if (gameState == GameState::MENU)
     {
         menu();
@@ -110,6 +111,7 @@ void loop()
     }
     if (gameState == GameState::LOSE)
     {
+        lose();
     }
 
     timer.tick();
@@ -411,10 +413,10 @@ void lose()
     leds.fill_solid(CRGB::Red);
 
     tone(BUZZER_PIN, 400, 250);
-    timerTone.in(250, playTone, 300);
-    timerTone.in(500, playTone, 200);
+    timerTone.in(250, playTone, 1000);
+    timerTone.in(500, playTone, 500);
     timerTone.in(750, playTone, 100);
-    timerTone.in(1000, playTone, 200);
+    timerTone.in(1000, playTone, 500);
     timerTone.in(1250, playTone, 100);
     timer.in(1500, resetGame);
 }
@@ -430,7 +432,7 @@ void displayLEDs() // use this to handle what the led strip should be doing
         fill_solid(leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed), numLedsInSection, colorList[i]);
         if (!colorActiveList[i])
         { // if the color is not "active" dim it a bit
-            leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed).fadeLightBy(128);
+            leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed).fadeLightBy(230);
         }
     }
 
@@ -446,10 +448,10 @@ void displayLEDs() // use this to handle what the led strip should be doing
         leds[((x - 1) % INTERNAL_NUM_LEDS)] = colorPointedAt;
         leds[((x - 2) % INTERNAL_NUM_LEDS)] = colorPointedAt;
 
-        leds[((x + 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
-        leds[((x + 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
-        leds[((x - 1) % INTERNAL_NUM_LEDS)].fadeLightBy(64);
-        leds[((x - 2) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
+        leds[((x + 2) % INTERNAL_NUM_LEDS)].fadeLightBy(220);
+        leds[((x + 1) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
+        leds[((x - 1) % INTERNAL_NUM_LEDS)].fadeLightBy(192);
+        leds[((x - 2) % INTERNAL_NUM_LEDS)].fadeLightBy(220);
     }
     leds(0, INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
 
