@@ -25,10 +25,10 @@ float joystickMagnitude = 0;
 int joystickAngle = 0; // change to uint_t
 int8_t joystickDirection = 0;
 
-bool buttonPressed;
-bool buttonReleased;
-bool joystickMoved;
-bool joystickReleased;
+bool buttonPressed = false;
+bool buttonReleased = true;
+bool joystickMoved = false;
+bool joystickReleased = true;
 
 LiquidCrystal_74HC595 lcd(11, 13, 12, 1, 3, 4, 5, 6, 7);
 
@@ -54,16 +54,16 @@ enum class GameState
 };
 
 auto timer = timer_create_default();
-GameState gameState;
-int8_t menuScreen;
-int8_t selectedScreen;
-bool isPlayerTurn;
+GameState gameState = GameState::MENU;
+int8_t menuScreen = 0;
+int8_t selectedScreen = -1;
+bool isPlayerTurn = false;
 int8_t patternList[100];
-int8_t numColors;
-int8_t timeToAnswer;
-int8_t roundNum;
-int8_t timeLeft;
-int8_t inputNum;
+int8_t numColors = 4;
+int8_t timeToAnswer = 5;
+int8_t roundNum = 1;
+int8_t timeLeft = 0;
+int8_t inputNum = 0;
 
 const CRGB colorList[] = {
     CRGB::Blue, CRGB::Red, CRGB::Green, CRGB::Yellow,                     //
@@ -73,14 +73,16 @@ const CRGB colorList[] = {
 bool colorActiveList[12]; //true if color should be bright
 
 Timer<3, millis, uint8_t> timerColor;
-Timer<8, millis, int> timerTone;
+
 #define MAX_BUZZER_FREQ 2000
 #define MIN_BUZZER_FREQ 1000
 int buzzerToneList[12]; //corresponds to each color
 
+//const char song[] PROGMEM = "::e,8f,8g,8a,8b,8c1,8d1,8e1";
+//MusicWithoutDelay buzzer(song);
 /*
 TODO:
-    ! REPLACE ACTIVE BUZZER WITH PASSIVE BUZZER
+    ! WHEN NEED TO USE TONE, DISABLE LED UPDATE.
     ! CALIBRATE LIGHTS/JOYSTICK
     ! DISPLAY ROUND NUMBER ON LCD
     ! DISPLAY TIME LEFT ON 7 SEGMENT DISPLAY
@@ -92,7 +94,6 @@ TODO:
     ? ADD BETTER LIGHTING AND SOUND EFFECTS
     ? CHANGE MENU SYSTEM TO 2D ARRAY OF TITLE AND VALUES (MENU = { {TITLE, VALUE}, {TITLE, VALUE} }
 */
-
 void setup()
 {
     Serial.begin(9600);
@@ -109,28 +110,43 @@ void setup()
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     randomSeed(analogRead(A5));
-    timer.in(0, resetGame);
+    //timer.in(0, resetGame);
+    menuScreen = 0;
+    selectedScreen = -1;
+    roundNum = 1;
+    timeLeft = 0;
+    inputNum = 0;
+    isPlayerTurn = false;
+    displayDigit(-1);
+    timerColor.empty();
+    timer.empty();
+    gameState = GameState::MENU;
+    tone(BUZZER_PIN, 900, 50);
 }
 
 void loop()
 {
-    inputUpdate();
 
-    switch (gameState)
+    inputUpdate();
+    
+
+
+    if (gameState == GameState::MENU)
     {
-    case GameState::MENU:
         menu();
-        break;
-    case GameState::GAME:
+    }
+    if (gameState == GameState::GAME)
+    {
         game();
-        break;
-    case GameState::LOSE:
+    }
+    if (gameState == GameState::LOSE)
+    {
         lose();
-        break;
     }
 
     timer.tick();
     displayLEDs();
+    //FastLED.show();
     EVERY_N_MILLIS(50)
     {
         lcd.clear();
@@ -230,11 +246,11 @@ void menu()
             }
             break;
         }
-        if (buttonPressed && selectedScreen == -1)
-        {
-            selectedScreen = menuScreen;
-            return;
-        }
+    }
+    if (buttonPressed && selectedScreen == -1)
+    {
+        selectedScreen = menuScreen;
+        return;
     }
 
     switch (selectedScreen) //this is disgusting. if you have time please fix this
@@ -363,7 +379,7 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
             {
                 colorActiveList[i] = false;
             }
-            if (inputNum > roundNum)
+            if (inputNum >= roundNum)
             {
                 inputNum = 0;
                 isPlayerTurn = true;
@@ -409,11 +425,8 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
             {
                 inputNum++;
                 timeLeft = timeToAnswer;
-                noTone(BUZZER_PIN);
-                tone(BUZZER_PIN, buzzerToneList[input]);
                 colorActiveList[input] = true;
                 timerColor.in(200, disableSection, input);
-                timer.in(200, stopBuzzer);
             }
             else
             {
@@ -434,14 +447,19 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
 void lose()
 {
     leds.fill_solid(CRGB::Red);
-
-    tone(BUZZER_PIN, 400, 250);
-    timerTone.in(250, playTone, 1000);
-    timerTone.in(500, playTone, 500);
-    timerTone.in(750, playTone, 100);
-    timerTone.in(1000, playTone, 500);
-    timerTone.in(1250, playTone, 100);
-    timer.in(1500, resetGame);
+    resetGame();
+    // tone(BUZZER_PIN, 100, 200);
+    // FastLED.delay(250);
+    // tone(BUZZER_PIN, 300, 200);
+    // FastLED.delay(250);
+    // tone(BUZZER_PIN, 100, 200);
+    // FastLED.delay(250);
+    // tone(BUZZER_PIN, 300, 200);
+    // FastLED.delay(250);
+    // tone(BUZZER_PIN, 50, 200);
+    // FastLED.delay(250);
+    // noTone(BUZZER_PIN);
+    //resetGame();
 }
 
 void displayLEDs() // use this to handle what the led strip should be doing
@@ -455,7 +473,7 @@ void displayLEDs() // use this to handle what the led strip should be doing
         fill_solid(leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed), numLedsInSection, colorList[i]);
         if (!colorActiveList[i])
         { // if the color is not "active" dim it a bit
-            leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed).fadeLightBy(230);
+            leds(INTERNAL_NUM_LEDS + startLed, INTERNAL_NUM_LEDS + endLed).fadeLightBy(210);
         }
     }
 
@@ -478,7 +496,7 @@ void displayLEDs() // use this to handle what the led strip should be doing
     }
     leds(0, INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
 
-    FastLED.show();
+    
 }
 
 int getJoystickColorIndex() //get color joystick is pointing to;
@@ -499,25 +517,13 @@ int getInput()
     }
 }
 
-bool stopBuzzer(void *)
-{
-    noTone(BUZZER_PIN);
-    return false; // to repeat the action - false to stop
-}
-
-bool playTone(int frequency)
-{
-    tone(BUZZER_PIN, frequency, 200);
-    return false;
-}
-
 bool disableSection(uint8_t section)
 {
     colorActiveList[section] = false;
     return false;
 }
 
-bool resetGame(void *)
+void resetGame()
 {
     menuScreen = 0;
     selectedScreen = -1;
@@ -527,8 +533,6 @@ bool resetGame(void *)
     isPlayerTurn = false;
     displayDigit(-1);
     timerColor.empty();
-    timerTone.empty();
     timer.empty();
     gameState = GameState::MENU;
-    return false;
 }
