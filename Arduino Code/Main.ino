@@ -64,6 +64,7 @@ int8_t timeToAnswer = 5;
 int8_t roundNum = 1;
 int8_t timeLeft = 0;
 int8_t inputNum = 0;
+uint8_t highScore = 0;
 
 CRGB colorList[] = {
     CRGB::Blue, CRGB::Red, CRGB::Green, CRGB::Yellow,                     //
@@ -77,6 +78,7 @@ Timer<16, millis, uint8_t> timerColor;
 #define MAX_BUZZER_FREQ 2000
 #define MIN_BUZZER_FREQ 100
 int buzzerToneList[12]; //corresponds to each color
+long idleTime = millis();
 
 /*
 TODO:
@@ -152,6 +154,10 @@ void inputUpdate()
 
     joystickMoved = joystickMagnitude >= 0.5 && joystickReleased;
     joystickReleased = joystickMagnitude < 0.5;
+    if ((joystickMoved || buttonPressed) || gameState != GameState::MENU)
+    {
+        idleTime = millis();
+    }
 
     joystickDirection = getJoystickDirection();
 }
@@ -210,6 +216,13 @@ void menu()
     case 0: // Play screen
         lcd.setCursor(6, 0);
         lcd.print(F("Play"));
+        if (highScore > 0)
+        {
+            lcd.setCursor(0, 1);
+            lcd.print(F("High Score:"));
+            lcd.setCursor(13, 1);
+            lcd.print(highScore);
+        }
         break;
     case 1: // Change color num screen
         lcd.setCursor(2, 0);
@@ -274,7 +287,7 @@ void menu()
     case 0:                           //Selected play
         for (int i = 0; i < 100; i++) //fill pattern list
         {
-            patternList[i] = random(0, numColors - 1);
+            patternList[i] = random(0, numColors);
         }
         for (int i = 0; i < numColors; i++) //fill buzzer tone list
         {
@@ -282,6 +295,10 @@ void menu()
             buzzerToneList[i] = MIN_BUZZER_FREQ + (step * i);
         }
         gameState = GameState::GAME;
+        lcd.clear();
+        lcd.setCursor(5,0);
+        lcd.print(F("Ready?"));
+        delay(1000);
         break;
     case 1: //Selected color num
         if (numColors != 2)
@@ -386,6 +403,25 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
 
     if (isPlayerTurn)
     {
+        if (inputNum >= roundNum)
+        {
+            roundNum++;
+            inputNum = 0;
+
+            long now = millis();
+            while (millis() - now < 200)
+            {
+                timerColor.tick();
+            }
+            for (int i = 0; i < 12; i++)
+            {
+                colorActiveList[i] = false;
+            }
+            isPlayerTurn = false;
+            leds[1, INTERNAL_NUM_LEDS] = (CRGB::Black);
+            FastLED.delay(500);
+        }
+
         if (timeToAnswer != 10)
         {
             EVERY_N_SECONDS(1)
@@ -409,6 +445,7 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
                 inputNum++;
                 timeLeft = timeToAnswer;
                 colorActiveList[input] = true;
+                FastLED.show();
                 timerColor.in(100, disableSection, input);
                 tone(BUZZER_PIN, buzzerToneList[input]);
                 delay(50);
@@ -420,46 +457,44 @@ void game() // use isPlayerTurn to choose whether a pattern is showing or player
                 return;
             }
         }
-
-        if (inputNum >= roundNum)
-        {
-            roundNum++;
-            inputNum = 0;
-
-            long now = millis();
-            while (millis() - now < 200)
-            {
-                timerColor.tick();
-            }
-            for (int i = 0; i < 12; i++)
-            {
-                colorActiveList[i] = false;
-            }
-            isPlayerTurn = false;
-            FastLED.delay(1000);
-        }
     }
 }
 
 void lose()
 {
     leds.fill_solid(CRGB::Red);
+    FastLED.show();
     tone(BUZZER_PIN, 100);
     delay(250);
     FastLED.clear();
+    FastLED.show();
     tone(BUZZER_PIN, 300);
     delay(250);
     leds.fill_solid(CRGB::Red);
+    FastLED.show();
     tone(BUZZER_PIN, 100);
     delay(250);
     FastLED.clear();
+    FastLED.show();
     tone(BUZZER_PIN, 300);
     delay(250);
     leds.fill_solid(CRGB::Red);
+    FastLED.show();
     tone(BUZZER_PIN, 50);
     delay(250);
     FastLED.clear();
+    FastLED.show();
     noTone(BUZZER_PIN);
+    lcd.clear();
+    lcd.setCursor(1, 0);
+    lcd.print(F("You made it to"));
+    lcd.setCursor(4, 1);
+    lcd.print(F("Round"));
+    lcd.setCursor(10, 1);
+    lcd.print(roundNum);
+    if(roundNum > highScore)
+        highScore = roundNum;
+    delay(2000);
     resetGame();
 }
 
@@ -485,20 +520,20 @@ void displayLEDs() // use this to handle what the led strip should be doing
         adjustedAngle = (adjustedAngle + 140) % 360;
         CRGB colorPointedAt = colorList[getJoystickColorIndex(adjustedAngle)];
 
-        int x = map(adjustedAngle, 0, 359, 0, (INTERNAL_NUM_LEDS - 2));
-
-        leds[((x + 2) % INTERNAL_NUM_LEDS) + 1] = colorPointedAt;
-        leds[((x + 1) % INTERNAL_NUM_LEDS) + 1] = colorPointedAt;
-        leds[x + 1] = colorPointedAt;
-        leds[((x - 1) % INTERNAL_NUM_LEDS) + 1] = colorPointedAt;
-        leds[((x - 2) % INTERNAL_NUM_LEDS) + 1] = colorPointedAt;
-
-        leds[((x + 2) % INTERNAL_NUM_LEDS) + 1].fadeLightBy(220);
-        leds[((x + 1) % INTERNAL_NUM_LEDS) + 1].fadeLightBy(192);
-        leds[((x - 1) % INTERNAL_NUM_LEDS) + 1].fadeLightBy(192);
-        leds[((x - 2) % INTERNAL_NUM_LEDS) + 1].fadeLightBy(220);
+        int x = map(adjustedAngle, 0, 359, 1, (INTERNAL_NUM_LEDS - 1));
+        leds[x] = colorPointedAt;
     }
+    leds(0, INTERNAL_NUM_LEDS - 1).blur1d(32);
     leds(0, INTERNAL_NUM_LEDS - 1).fadeToBlackBy(50);
+
+    if (gameState == GameState::MENU && millis() - idleTime > 30000)
+    {
+
+        leds.fill_rainbow((millis() / 1) % 255, 10);
+        leds.blur1d(64);
+        leds.blur1d(64);
+        leds.fadeLightBy(240);
+    }
 
     FastLED.show();
 }
